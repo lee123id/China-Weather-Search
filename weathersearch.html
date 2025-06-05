@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实时天气预报</title>
+    <style>
+        :root {
+            --primary-color: #2196F3;
+            --bg-color: #f0f4f8;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background-color: var(--bg-color);
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .search-box {
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        #cityInput {
+            padding: 12px;
+            width: 60%;
+            border: 2px solid #ddd;
+            border-radius: 25px;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+
+        button {
+            padding: 12px 25px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background-color: #1976D2;
+        }
+
+        .weather-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            margin-top: 20px;
+        }
+
+        .current-weather {
+            display: flex;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .temp {
+            font-size: 48px;
+            color: var(--primary-color);
+            margin-right: 30px;
+        }
+
+        .weather-info {
+            flex-grow: 1;
+        }
+
+        .weather-detail {
+            color: #666;
+            margin-top: 10px;
+        }
+
+        .aqi-section {
+            background: #fff8e1;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .hourly-forecast {
+            display: flex;
+            overflow-x: auto;
+            padding: 15px 0;
+            gap: 10px;
+        }
+
+        .hour-item {
+            flex: 0 0 80px;
+            text-align: center;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .life-index {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .index-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .error {
+            color: #d32f2f;
+            text-align: center;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="search-box">
+        <input type="text" id="cityInput" placeholder="输入城市名称（如：北京 或 beijing）">
+        <button onclick="searchWeather()">查询天气</button>
+    </div>
+
+    <div id="weatherContainer"></div>
+
+    <script>
+        // API配置
+        const API_URL = 'http://gfeljm.tianqiapi.com/api?unescape=1&version=v62&appid=83458524&appsecret=ROsQH1Ce';
+
+        // 天气图标映射（根据实际返回的wea_img值配置）
+        const weatherIcons = {
+            'qing': '☀️',
+            'yin': '☁️',
+            'yu': '🌧️',
+            'yun': '⛅',
+            'lei': '⛈️'
+        };
+
+        async function searchWeather() {
+            const city = document.getElementById('cityInput').value.trim();
+            if (!city) {
+                alert('请输入城市名称');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}&city=${encodeURIComponent(city)}`);
+                const data = await response.json();
+                renderWeather(data);
+            } catch (error) {
+                showError('获取天气数据失败，请稍后重试');
+            }
+        }
+
+        function renderWeather(data) {
+            const container = document.getElementById('weatherContainer');
+            
+            container.innerHTML = `
+                <div class="weather-card">
+                    <div class="current-weather">
+                        <div class="temp">${data.tem}℃</div>
+                        <div class="weather-info">
+                            <h2>${data.city}</h2>
+                            <div class="weather-detail">
+                                ${weatherIcons[data.wea_img] || '⛅'} ${data.wea}
+                                <div>湿度: ${data.humidity} | 风速: ${data.win} ${data.win_speed}</div>
+                                <div>更新时间: ${data.update_time}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="aqi-section">
+                        <h3>空气质量</h3>
+                        <p>AQI指数: ${data.air}（${data.air_level}）</p>
+                        <p>PM2.5: ${data.air_pm25} | PM10: ${data.pm10}</p>
+                        <p>${data.air_tips}</p>
+                    </div>
+
+                    <h3>逐小时预报</h3>
+                    <div class="hourly-forecast">
+                        ${data.hours.map(hour => `
+                            <div class="hour-item">
+                                <div>${hour.hours}</div>
+                                <div>${weatherIcons[hour.wea_img] || '⛅'}</div>
+                                <div>${hour.tem}℃</div>
+                            </div>
+                        `).join('')}
+                    </div>
+
+                    <h3>生活指数</h3>
+                    <div class="life-index">
+                        ${Object.entries(data.zhishu).filter(([_,v]) => v.tips).map(([key, value]) => `
+                            <div class="index-item">
+                                <h4>${getChineseIndexName(key)}</h4>
+                                <p>${value.tips}</p>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function getChineseIndexName(key) {
+            const indexMap = {
+                'chuanyi': '穿衣指数',
+                'daisan': '雨伞指数',
+                'ganmao': '感冒指数',
+                'chenlian': '晨练指数',
+                'ziwaixian': '紫外线指数',
+                'liangshai': '晾晒指数',
+                'xiche': '洗车指数',
+                'lvyou': '旅游指数',
+                'diaoyu': '钓鱼指数'
+            };
+            return indexMap[key] || key;
+        }
+
+        function showError(message) {
+            document.getElementById('weatherContainer').innerHTML = `
+                <div class="error">${message}</div>
+            `;
+        }
+
+        // 支持回车键搜索
+        document.getElementById('cityInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') searchWeather();
+        });
+
+        // 默认加载北京天气
+        window.onload = () => {
+            document.getElementById('cityInput').value = '北京';
+            searchWeather();
+        };
+    </script>
+</body>
+</html>
